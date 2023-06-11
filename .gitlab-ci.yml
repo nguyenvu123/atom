@@ -1,0 +1,181 @@
+image: wodby/php:7.4
+
+variables:
+  ## CONFIGURATION ##
+  README_FILENAME: 'README.md'
+
+  ### ACTIVE JOBS ###
+  # Fill the value with 'yes' if you want to active the job. Anything else with desactivate him.
+  ACTIVE_JOB_VALIDATE: 'yes'
+  ACTIVE_JOB_BUILD: 'yes'
+  ACTIVE_JOB_BUILD_FRONT: 'yes'
+  ACTIVE_JOB_LINT: 'no'
+  ACTIVE_JOB_YAML: 'no'
+  ACTIVE_JOB_JSON: 'no'
+  ACTIVE_JOB_PHPMD: 'no'
+  ACTIVE_JOB_PHPCPD: 'no'
+  ACTIVE_JOB_SONARQUBE: 'no'
+  ### ACTIVE JOBS ###
+
+  ### ALLOW FAILURE ###
+  # Fill the value with 'yes' if you want to continu to the next step if a failure happen.
+  ALLOW_FAILURE_VALIDATE: 'yes'
+  ALLOW_FAILURE_BUILD: 'no'
+  ALLOW_FAILURE_BUILD_FRONT: 'yes'
+  ALLOW_FAILURE_CODE_QUALITY: 'yes'
+  ALLOW_FAILURE_CODE_ANALYSIS: 'yes'
+  ### ALLOW FAILURE ###
+
+stages:
+  - prebuild
+  - build
+  - build_front
+  - code_quality
+  - code_analysis
+  - archive
+  - deploy
+
+default:
+  tags:
+    - docker
+
+file-requirements:
+  stage: prebuild
+  script:
+    - 'if [[ -f README.md ]]; then echo "File README.md exist => OK" ; else echo "Fichier README.md manquant" && exit 1; fi'
+    - 'if [[ -f deploy.php ]]; then echo "File deploy.php exist => OK" ; else echo "File deploy.php manquant" && exit 1; fi'
+
+readme-requirements:
+  stage: prebuild
+  script:
+    - grep Requirements ${README_FILENAME}
+    - grep 'Installation' ${README_FILENAME}
+
+
+composer-validate:
+  stage: prebuild
+  script:
+    - composer validate
+  rules:
+    - if: "$ACTIVE_JOB_VALIDATE == 'yes' && $ALLOW_FAILURE_VALIDATE == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_VALIDATE == 'yes'"
+
+composer-install:
+  stage: build
+  script:
+    - composer install --dev --no-interaction
+  artifacts:
+    paths:
+      - ./vendor
+      - ./wp
+      - ./app/plugins
+    expire_in: 1 day
+  rules:
+    - if: "$ACTIVE_JOB_BUILD == 'yes' && $ALLOW_FAILURE_BUILD == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_BUILD == 'yes'"
+
+front:
+  image: node:17.6.0-stretch-slim
+  stage: build_front
+  script:
+    - 'cd front'
+    - 'yarn install'
+    - 'yarn build'
+    - 'yarn cms'
+  artifacts:
+    paths:
+      - ./front/dist
+      - ./app/themes/pvcp/assets
+    expire_in: 30 day
+  rules:
+    - if: "$ACTIVE_JOB_BUILD_FRONT == 'yes' && $ALLOW_FAILURE_BUILD_FRONT == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_BUILD_FRONT == 'yes'"
+
+phplint:
+  stage: code_quality
+  script:
+    - php ./bin/grumphp run --tasks=phplint --no-interaction
+  rules:
+    - if: "$ACTIVE_JOB_LINT == 'yes' && $ALLOW_FAILURE_CODE_QUALITY == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_LINT == 'yes'"
+
+yamllint:
+  stage: code_quality
+  script:
+    - php ./bin/grumphp run --tasks=yamllint --no-interaction
+  rules:
+    - if: "$ACTIVE_JOB_YAML == 'yes' && $ALLOW_FAILURE_CODE_QUALITY == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_YAML == 'yes'"
+
+phpmd:
+  stage: code_quality
+  script:
+    - php ./bin/grumphp run --tasks=phpmd --no-interaction
+  rules:
+    - if: "$ACTIVE_JOB_PHPMD == 'yes' && $ALLOW_FAILURE_CODE_QUALITY == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_PHPMD == 'yes'"
+
+phpcpd:
+  stage: code_quality
+  script:
+    - php ./bin/grumphp run --tasks=phpcpd --no-interaction
+  rules:
+    - if: "$ACTIVE_JOB_PHPCPD == 'yes' && $ALLOW_FAILURE_CODE_QUALITY == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_PHPCPD == 'yes'"
+
+sonarqube:
+  stage: code_analysis
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  before_script:
+    - ''
+  variables:
+    GIT_DEPTH: 0
+  script: sonar-scanner -X -Dsonar.projectKey=$SONAR_PROJECT_KEY -Dsonar.projectVersion="${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
+  rules:
+    - if: "$ACTIVE_JOB_SONARQUBE == 'yes' && $ALLOW_FAILURE_CODE_QUALITY == 'yes'"
+      allow_failure: true
+    - if: "$ACTIVE_JOB_SONARQUBE == 'yes'"
+
+archive:
+  stage: archive
+  script: echo Package application !
+  artifacts:
+    paths:
+      - ./composer.json
+      - ./composer.lock
+      - ./wp-content/themes
+    expire_in: 1 day
+  only:
+    refs:
+      - staging
+
+
+.deploy: &deploy
+  stage: deploy
+  before_script:
+    - curl -LO https://github.com/deployphp/deployer/releases/download/v7.0.0/deployer.phar
+    - mv deployer.phar /usr/local/bin/dep
+    - chmod +x /usr/local/bin/dep
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "$DEPLOYER_STAGING_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" >> ~/.ssh/config'
+
+deploy-staging:
+  script:
+    - dep application:deploy staging -vvv
+  only:
+    refs:
+      - staging
+  <<: *deploy
+

@@ -1,0 +1,43 @@
+/vendor/
+/wp/
+wp-config.php
+app/upgrade
+app/plugins/*
+app/mu-plugins/*/
+web/app/languages
+web/app/uploads/*
+app/uploads/*
+# Logs
+*.log
+
+# Dotenv
+.env
+.env.*
+!.env.sample
+
+# WP-CLI
+wp-cli.local.yml
+
+# IDE
+.idea/
+
+#front 
+node_modules
+front/dist/
+wp-content/themes/pvcp/dist/
+wp-content/themes/pvcp/assets/
+app/themes/pvcp/dist/
+app/themes/pvcp/assets/
+.DS_Store
+
+#plugins
+!app/plugins/advanced-custom-fields-pro
+!app/plugins/gravityforms/
+!app/plugins/gravityforms/js/vendor/
+!app/plugins/wpml-string-translation/
+!app/plugins/wpml-media-translation/
+!app/plugins/sitepress-multilingual-cms/
+!app/plugins/wp-all-export-pro/
+!app/plugins/wp-all-import-pro/
+
+

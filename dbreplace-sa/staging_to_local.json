@@ -1,0 +1,29 @@
+{
+  "options": {
+    "CLI": {
+      "output":           "json"
+    },
+    "PDO": {
+      "hostname":         "mariadb",
+      "port":             3306,
+      "username":         "php",
+      "password":         "php",
+      "database":         "php",
+      "charset":          "utf8mb4"
+    },
+    "DBSR": {
+      "case-insensitive": false,
+      "extensive-search": false,
+      "search-page-size": 10000,
+      "var-match-strict": true,
+      "floats-precision": 5,
+      "convert-charsets": true,
+      "var-cast-replace": true,
+      "db-write-changes": true,
+      "handle-serialize": true
+    }
+  },
+  "search": ["https://groupe.pvcp.staging.fides.io", "http://groupe.pvcp.staging.fides.io", "groupe.pvcp.staging.fides.io", "/home/pvcp/www/groupe/current"],
+  "replace": ["http://pvcp_wordpress.fides.io:8887", "http://pvcp_wordpress.fides.io:8887", "pvcp_wordpress.fides.io:8887", "/var/www/html/recette-reseau137"]
+}
+
